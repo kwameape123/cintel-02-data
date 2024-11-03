@@ -1,7 +1,18 @@
+# This is an interactive data application that features a dashboard displaying a data table, two histograms and two scatterplots 
+# for selected datasets. 
+
+# Users can modify specific aspects of the visuals and see the results in real-time. 
+
+# This data application consists of two components: the user interface and the server section. 
+
+# The user interface enables users to issue commands that are executed on the server side.
+
 # Import required dependencies
+import seaborn as sns
 import plotly.express as px
 import palmerpenguins # This package provides palmer penguin dataset.
-from shiny.express import input, ui
+from shiny import reactive
+from shiny.express import input, ui,render
 from shinywidgets import render_plotly
 
 ##############################
@@ -24,16 +35,80 @@ penguins_df = palmerpenguins.load_penguins()
 #Define and Design our user interface.
 ############################
 
+# Create a title for webpage
 ui.page_opts(title="Arnold Atchoe- Palmer Peguins", fillable=True)
-with ui.layout_columns():
+
+# Create a sidebar for user input and interaction.
+# Siderbar has the following features:
+# Header for the sidebar.
+# A selector that has 3 options and is currently not linked to any output.
+# An input box that takes only numbers and specify the number of bins for the bill lenght histogram.
+# An input slider that is used to specify the number of bins for the body mass histogram.
+# A list of species of penguins with checkbox to filter the first table.
+# A horizontal line(ui.hr) to separate sections of the side bar.
+# A link to the project github repository named "GitHub"
+# Note that the input value indicate in user interface components indicate the default value of these components when we run the program.
+
+
+with ui.sidebar(open="open"):
+    ui.h2("Sidebar")
+    ui.input_selectize("Selected_attribute","Select Attribute",["bill_length_mm", "bill_depth_mm", "flipper_length_mm", "body_mass_g"])
+    ui.input_numeric("plotly_bin_count","Number of Plotly Bins",value=6)
+    ui.input_slider("seaborn_bin_count","Number of Seaborn Bins",value=6,min=4,max=20)
+    ui.input_checkbox_group("selected_species_list","Select Species",["Adelie", "Gentoo", "Chinstrap"],selected=["Adelie"],inline=True)
+    ui.hr()
+    ui.a("GitHub",href="https://github.com/kwameape123/cintel-02-data",target="_blank")
 
 ############################
 # Render the desired charts and visuals
 ############################
-    @render_plotly
-    def plot1():
-        return px.histogram(penguins_df, x="bill_length_mm")
 
-    @render_plotly
-    def plot2():
-        return px.histogram(penguins_df, x="body_mass_g")
+# Render DataTable and Datagrid within the same layout column.
+with ui.layout_columns():
+# the reactive.event decorator allows for the filtering of data in data table using the options of the checkbox.  
+    with ui.card(full_screen=True):
+        ui.card_header("Data Table for Palmer Penguins")
+        @reactive.event(input.selected_species_list)
+        def species_data():
+            return penguins_df[penguins_df['species'].isin(input.selected_species_list())]
+# this render.data_frame decorator returns filtered data 
+        @render.data_frame
+        def table():
+           return species_data() 
+            
+    with ui.card(full_screen=True):
+        ui.card_header("Data Grid for Palmer Penguins")
+        @render.data_frame
+        def grid():
+           return render.DataGrid(data=penguins_df)
+
+# Render plotly and seaborn histogram within the same layout column.
+            
+with ui.layout_columns():
+     with ui.card(full_screen=True):
+        ui.card_header("Distribution of Penguins bill length")
+        @render_plotly
+        def plot1():
+            return px.histogram(penguins_df, x="bill_length_mm",nbins=input.plotly_bin_count())
+            
+     with ui.card(full_screen=True):
+        ui.card_header("Distribution of Penguins body mass")
+        @render.plot
+        def plot2():
+            return sns.histplot(data=penguins_df, x="body_mass_g")
+
+# Render plotly and seaborn scatterplot within the same layout column.
+            
+with ui.layout_columns(height="1000px"):
+     with ui.card(full_screen=True):
+        ui.card_header("Relationship between bill length and body mass(Plotly)")
+        @render_plotly
+        def plot3():
+         return px.scatter(data_frame=penguins_df,x="bill_length_mm", y="body_mass_g",color="species",hover_name="island",symbol="sex")
+
+     with ui.card(full_screen=True):
+        ui.card_header("Relationship between bill length and body mass(Seaborn)")
+        @render.plot
+        def plot4():
+         return sns.scatterplot(data=penguins_df,x="bill_length_mm", y="body_mass_g",hue="species")
+       
